@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Bible Verse QR Code Generator</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* Slate 100 */
+        }
+        .main-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .card {
+            background: #ffffff;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease;
+        }
+        /* Custom styling for the primary brand text */
+        .brand-text {
+            font-weight: 800;
+            background: linear-gradient(90deg, #1d4ed8, #22c55e); /* Blue to Green gradient */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        /* Style for the QR code image placeholder/canvas */
+        #qrcodeCanvas {
+            border: 8px solid #3b82f6; /* Blue 500 */
+            border-radius: 0.75rem;
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Container -->
+    <div id="app" class="main-container">
+
+        <!-- Generator/Display Card -->
+        <div id="card" class="card w-full max-w-lg p-6 sm:p-10 rounded-xl">
+            <!-- Content will be injected here by JavaScript -->
+        </div>
+
+        <!-- Hidden Message Modal (Replaces alert()) -->
+        <div id="messageModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg p-6 shadow-xl w-full max-w-sm">
+                <h3 id="modalTitle" class="text-xl font-bold mb-3 text-red-600">Error</h3>
+                <p id="modalMessage" class="text-gray-700"></p>
+                <button onclick="closeModal()" class="mt-5 w-full bg-blue-600 text-white p-3 rounded-lg font-semibold hover:bg-blue-700 transition">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load QRious Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <script type="module">
+
+        // --- GLOBAL CONSTANTS ---
+        const PERMANENT_TEXT = "Collision's Clothing\nFollow the right path.";
+
+        // Initial list of verses for rotation (hardcoded since database is removed)
+        const INITIAL_VERSES = [
+            {"verse": "I can do all things through Christ which strengtheneth me. - Philippians 4:13"},
+            {"verse": "For I know the thoughts that I think toward you, saith the Lord, thoughts of peace, and not of evil, to give you an expected end. - Jeremiah 29:11"},
+            {"verse": "Trust in the Lord with all thine heart; and lean not unto thine own understanding. - Proverbs 3:5"},
+            {"verse": "For God hath not given us the spirit of fear; but of power, and of love, and of a sound mind. - 2 Timothy 1:7"},
+            {"verse": "The Lord is my shepherd; I shall not want. - Psalm 23:1"},
+            {"verse": "Be strong and of a good courage; be not afraid, neither be thou dismayed: for the Lord thy God is with thee whithersoever thou goest. - Joshua 1:9"},
+            {"verse": "But they that wait upon the Lord shall renew their strength; they shall mount up with wings as eagles; they shall run, and not be weary; and they shall walk, and not faint. - Isaiah 40:31"},
+            {"verse": "A new commandment I give unto you, That ye love one another; as I have loved you, that ye also love one another. - John 13:34"},
+            {"verse": "The thief cometh not, but for to steal, and to kill, and to destroy: I am come that they might have life, and that they might have it more abundantly. - John 10:10"},
+            {"verse": "Casting all your care upon him; for he careth for you. - 1 Peter 5:7"},
+            {"verse": "For with God nothing shall be impossible. - Luke 1:37"},
+            {"verse": "Commit thy works unto the Lord, and thy thoughts shall be established. - Proverbs 16:3"},
+            {"verse": "Finally, brethren, whatsoever things are true, whatsoever things are honest, whatsoever things are just, whatsoever things are pure, whatsoever things are lovely, whatsoever things are of good report; if there be any virtue, and if there be any praise, think on these things. - Philippians 4:8"},
+            {"verse": "In all thy ways acknowledge him, and he shall direct thy paths. - Proverbs 3:6"},
+            {"verse": "Rejoice in the Lord always: and again I say, Rejoice. - Philippians 4:4"}
+        ];
+
+        // --- UTILITY FUNCTIONS ---
+
+        function showMessage(title, message, isError = false) {
+            const modal = document.getElementById('messageModal');
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('modalTitle').className = isError ? 'text-xl font-bold mb-3 text-red-600' : 'text-xl font-bold mb-3 text-blue-600';
+            modal.classList.remove('hidden');
+        }
+
+        window.closeModal = function() {
+            document.getElementById('messageModal').classList.add('hidden');
+        }
+
+        function setLoading(isLoading) {
+            const card = document.getElementById('card');
+            if (isLoading) {
+                card.innerHTML = `
+                    <div class="flex flex-col items-center justify-center p-8">
+                        <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="mt-4 text-gray-700">Loading...</p>
+                    </div>
+                `;
+            }
+        }
+
+        // --- APPLICATION INITIALIZATION ---
+        
+        /**
+         * Initializes the application based on the URL parameter.
+         */
+        function initApp() {
+            setLoading(false); // Clear any initial loading state
+
+            // Check the URL to determine which view to show
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('mode') === 'display_verse') {
+                renderVerseDisplay();
+            } else {
+                // If no mode parameter, show the generator view by default
+                renderQrGenerator();
+            }
+        }
+        
+        // --- QR CODE GENERATOR VIEW LOGIC ---
+
+        function renderQrGenerator() {
+            setLoading(false); // Clear loading state
+
+            // The permanent URL embedded in the QR code. This link returns to this page 
+            // but with a query parameter to show the verse display view.
+            const url = `${window.location.origin}${window.location.pathname}?mode=display_verse`;
+            const card = document.getElementById('card');
+
+            card.innerHTML = `
+                <h1 class="text-3xl font-bold mb-4 text-center text-gray-900">
+                    Standalone QR Code Generator
+                </h1>
+                <p class="text-center text-sm mb-6 text-gray-500">
+                    This QR code cycles through hardcoded Bible verses using your browser's local storage.
+                </p>
+
+                <!-- Permanent Text Display -->
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg mb-6">
+                    <h2 class="text-lg font-semibold text-gray-700 mb-2">Permanent Embedded Message:</h2>
+                    <p class="brand-text text-xl sm:text-2xl whitespace-pre-wrap leading-tight">${PERMANENT_TEXT}</p>
+                </div>
+
+                <!-- QR Code Output -->
+                <div class="flex flex-col items-center justify-center p-4 bg-white">
+                    <canvas id="qrcodeCanvas" class="w-full max-w-xs h-auto"></canvas>
+                </div>
+
+                <!-- URL Output -->
+                <div class="mt-6">
+                    <label for="qrUrl" class="block text-sm font-medium text-gray-700 mb-2">Scannable URL (Copy this!)</label>
+                    <div class="flex">
+                        <input id="qrUrl" type="text" readonly value="${url}"
+                               class="flex-1 p-3 border border-gray-300 rounded-l-lg bg-gray-100 text-sm focus:ring-blue-500 focus:border-blue-500"
+                               onclick="this.select(); document.execCommand('copy'); showMessage('Copied!', 'The dynamic URL has been copied to your clipboard.', false);" />
+                        <button onclick="document.getElementById('qrUrl').select(); document.execCommand('copy'); showMessage('Copied!', 'The dynamic URL has been copied to your clipboard.', false);"
+                                class="p-3 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 transition">
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Initialize QR code
+            new QRious({
+                element: document.getElementById('qrcodeCanvas'),
+                value: url,
+                size: 256,
+                padding: 10
+            });
+        }
+
+        // --- VERSE DISPLAY VIEW LOGIC (The page the QR code links to) ---
+
+        /**
+         * Displays the next available verse from the rotation using local storage.
+         */
+        function renderVerseDisplay() {
+            const card = document.getElementById('card');
+            
+            try {
+                // 1. Get current index from localStorage, default to 0
+                let currentIndex = parseInt(localStorage.getItem('verseIndex') || '0', 10);
+                const verseCount = INITIAL_VERSES.length;
+
+                if (verseCount === 0) {
+                    throw new Error("No hardcoded verses available.");
+                }
+
+                // 2. Calculate the index for the current scan (wrapping around)
+                const verseIndex = currentIndex % verseCount;
+                const verseText = INITIAL_VERSES[verseIndex].verse;
+
+                // 3. Update the index for the next scan and save to localStorage
+                const newIndex = currentIndex + 1;
+                localStorage.setItem('verseIndex', String(newIndex));
+
+                setLoading(false);
+                card.innerHTML = `
+                    <div class="text-center p-4">
+                        <h1 class="text-3xl sm:text-4xl brand-text mb-4">
+                            Collision's Clothing
+                        </h1>
+                        <p class="text-xl sm:text-2xl font-bold text-gray-800 mb-8 border-b-2 pb-4 border-blue-500 inline-block">
+                            Follow the right path.
+                        </p>
+
+                        <div class="mt-8 p-6 bg-blue-50 border-l-4 border-blue-600 rounded-lg shadow-inner">
+                            <p class="text-2xl italic text-gray-700 leading-relaxed mb-4">
+                                ${verseText}
+                            </p>
+                            <p class="text-xs text-gray-500 font-medium">
+                                (Scan Index: #${currentIndex + 1}. Total Verses: ${verseCount})
+                            </p>
+                        </div>
+
+                        <!-- Removed the "Go back to Generator" link to make this page a final destination -->
+                    </div>
+                `;
+
+            } catch (e) {
+                console.error("Verse Display Error:", e);
+                setLoading(false);
+                card.innerHTML = `
+                    <div class="text-center p-8">
+                        <h1 class="text-3xl font-bold text-red-600 mb-4">Display Error</h1>
+                        <p class="text-lg text-gray-700 mb-8">
+                            We couldn't retrieve a verse from the local list.
+                        </p>
+                        <p class="text-xl sm:text-2xl font-bold text-gray-800 mb-8 border-b-2 pb-4 border-blue-500 inline-block">
+                            ${PERMANENT_TEXT}
+                        </p>
+                        <a href="${window.location.origin}${window.location.pathname}"
+                           class="mt-6 inline-block p-3 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition shadow-lg">
+                            Return to Generator
+                        </a>
+                    </div>
+                `;
+            }
+        }
+
+        // --- START APPLICATION ---
+        window.onload = initApp;
+    </script>
+</body>
+</html>
